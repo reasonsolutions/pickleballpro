@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection rules - these take precedence
+    match /users/{userId} {
+      // Users can create their own documents (needed for signup)
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Users can delete their own data
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to update their own data
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Additional validation for facility manager specific fields
+      allow update: if request.auth != null &&
+                      request.auth.uid == userId &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager' &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasAny(['openTime', 'closeTime', 'isOnline', 'photoURL']);
+      
+      // Users can read their own data, and facility managers/admins can read all user data
+      allow read: if request.auth != null && (
+                    request.auth.uid == userId ||
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager' ||
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+                  );
+    }
+    
+    // Courts collection rules
+    match /courts/{courtId} {
+      // Anyone can read court data - even if not authenticated
+      allow read: if true;
+      
+      // Only authenticated users with admin or facility_manager roles can write to courts
+      allow create, update, delete: if request.auth != null && (
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager'
+                   );
+    }
+    
+    // Facilities collection rules (if you decide to add this collection)
+    match /facilities/{facilityId} {
+      // Anyone can read facility data
+      allow read: if true;
+      
+      // Only admins and facility managers can write
+      allow write: if request.auth != null && (
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager'
+                   );
+    }
+    
+    // Bookings collection rules
+    match /bookings/{bookingId} {
+      // Users can read all bookings to check availability
+      allow read: if request.auth != null;
+      
+      // Users can create bookings for themselves
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Users can only update or delete their own bookings
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Tournaments collection rules
+    match /tournaments/{tournamentId} {
+      // Anyone can read tournament data
+      allow read: if true;
+      
+      // Only admins and facility managers can create or delete tournaments
+      allow create, delete: if request.auth != null && (
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager'
+                   );
+                   
+      // Allow updates from admins and facility managers for full documents
+      allow update: if request.auth != null && (
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager'
+                   ) ||
+                   // Allow players to register for tournaments (only updating participants and currentParticipants)
+                   (
+                     request.auth != null &&
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'currentParticipants']) &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'player'
+                   );
+    }
+    
+    // Products collection rules
+    match /products/{productId} {
+      // Anyone can read product data, but only admins can write
+      allow read: if true;
+      allow write: if request.auth != null &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Orders collection rules
+    match /orders/{orderId} {
+      // Users can read and create their own orders
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Only admins can update or delete orders
+      allow update, delete: if request.auth != null &&
+                             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // For all other collections, apply these broader rules
+    match /{document=**} {
+      // Allow any authenticated user to read all documents
+      allow read: if request.auth != null;
+      
+      // Allow facility managers and admins to write to all documents
+      // This rule only applies to documents not covered by more specific rules above
+      allow write: if request.auth != null && (
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'facility_manager' ||
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+                  );
+    }
+  }
+}

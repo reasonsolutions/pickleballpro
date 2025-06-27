@@ -1,0 +1,30 @@
+/* Global text color override - makes all text white */
+.text-gray-400, .text-gray-500, .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900,
+.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800,
+.text-red-500, .text-red-600, .text-red-700, .text-red-800,
+.text-green-500, .text-green-600, .text-green-700, .text-green-800,
+.text-yellow-500, .text-yellow-600, .text-yellow-700, .text-yellow-800,
+.text-primary-500, .text-primary-600, .text-primary-700,
+.text-black, .text-emerald-600 {
+  color: white !important;
+}
+
+/* Force all text to be white except for inputs, form elements, and modal content */
+body *:not(input):not(textarea):not(select):not(option):not(.bg-white *):not(.glass-card *) {
+  color: white !important;
+}
+
+/* Keep form elements with their original color for readability */
+input, textarea, select, option {
+  color: initial !important;
+}
+
+/* Set modal content with white background to have black text */
+.bg-white *, .rounded-lg, .glass-card * {
+  color: #000000 !important;
+}
+
+/* Exception for buttons inside glass-card */
+.glass-card button {
+  color: white !important;
+}
